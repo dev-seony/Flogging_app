@@ -6,7 +6,7 @@ class TrashCameraScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('쓰레기 분류')),
+      backgroundColor: Colors.white,
       body: TrashClassifier(),
     );
   }
