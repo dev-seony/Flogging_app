@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../models/jog_record.dart';
 import 'plogging_diary_screen.dart';
 import 'trash_camera_screen.dart';
 import 'jogging_screen.dart';
@@ -14,8 +16,61 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class HomeMainContent extends StatelessWidget {
+class HomeMainContent extends StatefulWidget {
   const HomeMainContent({Key? key}) : super(key: key);
+
+  @override
+  State<HomeMainContent> createState() => _HomeMainContentState();
+}
+
+class _HomeMainContentState extends State<HomeMainContent> {
+
+  // 오늘의 조깅 기록 계산
+  Map<String, dynamic> _getTodayJoggingStats() {
+    try {
+      final jogBox = Hive.box<JogRecord>('jog_records');
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+
+      double totalDistance = 0.0;
+      int totalDuration = 0;
+      int totalSteps = 0;
+
+      for (final record in jogBox.values) {
+        if (record.date.isAfter(todayStart) && record.date.isBefore(todayEnd)) {
+          totalDistance += record.distanceKm;
+          totalDuration += record.durationSeconds;
+          totalSteps += (record.distanceKm * 1300).round(); // 1km당 약 1300보로 계산
+        }
+      }
+
+      return {
+        'distance': totalDistance,
+        'duration': totalDuration,
+        'steps': totalSteps,
+      };
+    } catch (e) {
+      print('오늘의 조깅 기록 계산 오류: $e');
+      return {
+        'distance': 0.0,
+        'duration': 0,
+        'steps': 0,
+      };
+    }
+  }
+
+  String _formatDuration(int seconds) {
+    if (seconds == 0) return '0분';
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    
+    if (hours > 0) {
+      return '${hours}시간 ${minutes}분';
+    } else {
+      return '${minutes}분';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,59 +90,62 @@ class HomeMainContent extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           children: [
             const SizedBox(height: 16),
-            // 검색창
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: const [
-                  Icon(Icons.search, color: Colors.grey),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text('Search', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            // 오늘의 플로깅 정보 (일러스트+텍스트)
-            Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Image.network(
-                    'https://cdn.pixabay.com/photo/2017/01/31/13/14/people-2026444_1280.png',
-                    width: 120,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(Icons.directions_run, size: 100, color: Colors.grey[300]),
-                  ),
-                ),
-                Positioned(
-                  left: 20,
-                  top: 30,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Today', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 8),
-                      Text('3.2km  3,450 steps  3H', style: TextStyle(fontSize: 16)),
-                    ],
-                  ),
-                ),
-              ],
+            // 오늘의 조깅 정보 (일러스트+텍스트)
+            ValueListenableBuilder(
+              valueListenable: Hive.box<JogRecord>('jog_records').listenable(),
+              builder: (context, Box<JogRecord> box, _) {
+                final todayStats = _getTodayJoggingStats();
+                final distanceText = '${todayStats['distance'].toStringAsFixed(1)}km';
+                final stepsText = '${todayStats['steps'].toStringAsFixed(0)} steps';
+                final durationText = _formatDuration(todayStats['duration']);
+                
+                return Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Image.network(
+                        'https://cdn.pixabay.com/photo/2017/01/31/13/14/people-2026444_1280.png',
+                        width: 120,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(Icons.directions_run, size: 100, color: Colors.grey[300]),
+                      ),
+                    ),
+                    Positioned(
+                      left: 20,
+                      top: 30,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Today', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Text(
+                            '$distanceText  $stepsText  $durationText',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
             // 카테고리

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:hive_flutter/hive_flutter.dart';
 import 'firebase_options.dart';
+import 'models/jog_record.dart';
 import 'screens/home_screen.dart';
 import 'screens/plogging_diary_screen.dart';
 import 'screens/trash_camera_screen.dart';
@@ -12,6 +14,12 @@ final ValueNotifier<int> tabIndexNotifier = ValueNotifier<int>(0);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Hive 초기화
+  await Hive.initFlutter();
+  Hive.registerAdapter(JogRecordAdapter());
+  await Hive.openBox<JogRecord>('jog_records');
+  
   if (kIsWeb) {
     await Firebase.initializeApp(options: firebaseOptions);
   } else {

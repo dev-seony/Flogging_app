@@ -1,9 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flogging_app/screens/plogging_diary_write_screen.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../models/jog_record.dart';
 
 class PloggingDiaryScreen extends StatelessWidget {
   const PloggingDiaryScreen({Key? key}) : super(key: key);
+
+  String _formatDuration(int seconds) {
+    if (seconds == 0) return '0분';
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    
+    if (hours > 0) {
+      return '${hours}시간 ${minutes}분';
+    } else {
+      return '${minutes}분';
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,25 +30,60 @@ class PloggingDiaryScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Plogging Diary', style: TextStyle(color: Colors.black)),
+        title: const Text('오늘의 조깅', style: TextStyle(color: Colors.black)),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('plogging_diary').orderBy('createdAt', descending: true).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+      body: ValueListenableBuilder(
+        valueListenable: Hive.box<JogRecord>('jog_records').listenable(),
+        builder: (context, Box<JogRecord> box, _) {
+          final today = DateTime.now();
+          final todayStart = DateTime(today.year, today.month, today.day);
+          final todayEnd = todayStart.add(const Duration(days: 1));
+          
+          final todayRecords = box.values
+              .where((record) => record.date.isAfter(todayStart) && record.date.isBefore(todayEnd))
+              .toList()
+              .reversed
+              .toList();
+
+          if (todayRecords.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.directions_run,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '오늘은 아직 조깅하지 않았습니다',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '조깅을 시작하여 오늘의 기록을 남겨보세요!',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('아직 기록이 없습니다', style: TextStyle(color: Colors.grey, fontSize: 16)));
-          }
-          final diaryList = snapshot.data!.docs;
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: diaryList.length,
+            itemCount: todayRecords.length,
             itemBuilder: (context, idx) {
-              final item = diaryList[idx].data() as Map<String, dynamic>;
+              final record = todayRecords[idx];
               return Card(
                 color: Colors.white,
                 margin: const EdgeInsets.only(bottom: 20),
@@ -43,43 +96,72 @@ class PloggingDiaryScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(item['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          Icon(
+                            Icons.directions_run,
+                            color: Colors.green[600],
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
+                          Text(
+                            '조깅 기록',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.green[600],
+                            ),
+                          ),
+                          const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.lightGreen[100],
+                              color: Colors.green[50],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(item['distance'] ?? '', style: const TextStyle(fontSize: 13, color: Colors.green)),
+                            child: Text(
+                              _formatDate(record.date),
+                              style: TextStyle(fontSize: 13, color: Colors.green[700]),
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      // TODO: 사진 미리보기
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _Info(label: '거리', value: item['distance'] ?? '-'),
-                          _Info(label: '시간', value: item['time'] ?? '-'),
-                          _Info(label: '스텝', value: item['steps'] ?? '-'),
+                          _Info(label: '거리', value: '${record.distanceKm.toStringAsFixed(1)}km'),
+                          _Info(label: '시간', value: _formatDuration(record.durationSeconds)),
+                          _Info(label: '속도', value: '${record.speedKmph.toStringAsFixed(1)}km/h'),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
                           width: double.infinity,
-                          height: 60,
-                          color: Colors.grey[200],
-                          child: const Center(child: Text('지도 미리보기', style: TextStyle(color: Colors.grey))),
+                          height: 120,
+                          color: Colors.grey[100],
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.map,
+                                  size: 32,
+                                  color: Colors.grey[600],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '조깅 경로',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      if ((item['memo'] ?? '').isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Text(item['memo'], style: const TextStyle(fontSize: 14, color: Colors.black87)),
-                      ],
                     ],
                   ),
                 ),

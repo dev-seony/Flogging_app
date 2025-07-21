@@ -19,7 +19,7 @@ class FirebaseService {
   }
 
   // 사용자 정보 저장
-  Future<void> saveUser(FloggingUser user) async {
+  Future<void> saveUser(PloggingUser user) async {
     await _firestore.collection('users').doc(user.id).set(user.toMap());
   }
 
