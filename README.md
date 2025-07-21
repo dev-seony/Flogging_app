@@ -1,4 +1,4 @@
-# Plogging (플로깅 앱)
+# Ploggy (플로깅 앱)
 
 Flutter + Firebase 기반의 조깅 & 쓰레기줍기(플로깅) 기록/공유 앱입니다.
 
@@ -81,5 +81,3 @@ flutter pub get
 ### 7. **주요 사용 패키지**
 - `firebase_core`, `cloud_firestore` (필수)
 - `image_picker`, `provider` 등 (선택)
-
----
