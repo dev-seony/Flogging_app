@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-class JoggingMap extends StatelessWidget {
-  const JoggingMap({Key? key}) : super(key: key);
+class PloggingMap extends StatelessWidget {
+  const PloggingMap({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

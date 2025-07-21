@@ -1,6 +1,6 @@
 {
-    "name": "flogging_app",
-    "short_name": "flogging_app",
+    "name": "plogging_app",
+    "short_name": "plogging_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

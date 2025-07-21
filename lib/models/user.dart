@@ -1,4 +1,4 @@
-class FloggingUser {
+class PloggingUser {
   final String id;
   final String name;
   final String email;
@@ -7,7 +7,7 @@ class FloggingUser {
   final int totalTrash;
   final List<String> badges;
 
-  FloggingUser({
+  PloggingUser({
     required this.id,
     required this.name,
     required this.email,
@@ -27,7 +27,7 @@ class FloggingUser {
     'badges': badges,
   };
 
-  factory FloggingUser.fromMap(Map<String, dynamic> map) => FloggingUser(
+  factory PloggingUser.fromMap(Map<String, dynamic> map) => PloggingUser(
     id: map['id'],
     name: map['name'],
     email: map['email'],

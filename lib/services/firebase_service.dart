@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import '../models/jogging_record.dart';
+import '../models/plogging_record.dart';
 import '../models/trash_record.dart';
 import '../models/user.dart';
 
@@ -8,9 +8,9 @@ class FirebaseService {
   final _firestore = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
 
-  // 조깅 기록 저장
-  Future<void> saveJoggingRecord(JoggingRecord record) async {
-    await _firestore.collection('jogging_records').doc(record.id).set(record.toMap());
+  // 플로깅 기록 저장
+  Future<void> savePloggingRecord(PloggingRecord record) async {
+    await _firestore.collection('plogging_records').doc(record.id).set(record.toMap());
   }
 
   // 쓰레기 기록 저장

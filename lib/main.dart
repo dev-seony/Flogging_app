@@ -17,15 +17,15 @@ void main() async {
   } else {
     await Firebase.initializeApp();
   }
-  runApp(const FloggingApp());
+  runApp(const PloggingApp());
 }
 
-class FloggingApp extends StatelessWidget {
-  const FloggingApp({super.key});
+class PloggingApp extends StatelessWidget {
+  const PloggingApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flogging',
+      title: 'Plogging',
       theme: ThemeData(
         primarySwatch: Colors.green,
         scaffoldBackgroundColor: Colors.white,
