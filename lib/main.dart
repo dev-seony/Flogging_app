@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'models/jog_record.dart';
 import 'screens/home_screen.dart';
@@ -9,6 +10,8 @@ import 'screens/plogging_diary_screen.dart';
 import 'screens/trash_camera_screen.dart';
 import 'screens/jogging_screen.dart';
 import 'screens/community_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_provider.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier<int>(0);
 
@@ -32,14 +35,42 @@ class PloggingApp extends StatelessWidget {
   const PloggingApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Plogging',
-      theme: ThemeData(
-        primarySwatch: Colors.green,
-        scaffoldBackgroundColor: Colors.white,
+    return ChangeNotifierProvider(
+      create: (_) => AuthProvider(),
+      child: MaterialApp(
+        title: 'Plogging',
+        theme: ThemeData(
+          primarySwatch: Colors.green,
+          scaffoldBackgroundColor: Colors.white,
+        ),
+        debugShowCheckedModeBanner: false,
+        home: const AuthWrapper(),
       ),
-      debugShowCheckedModeBanner: false,
-      home: const MainTabNavigator(),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        if (authProvider.isLoading) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        
+        if (authProvider.isAuthenticated) {
+          return const MainTabNavigator();
+        } else {
+          return const LoginScreen();
+        }
+      },
     );
   }
 }

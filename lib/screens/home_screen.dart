@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 import '../models/jog_record.dart';
+import '../services/auth_provider.dart';
 import 'plogging_diary_screen.dart';
 import 'trash_camera_screen.dart';
 import 'jogging_screen.dart';
@@ -12,7 +14,52 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const HomeMainContent();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ploggy'),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                final authProvider = context.read<AuthProvider>();
+                try {
+                  await authProvider.signOut();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('로그아웃 중 오류가 발생했습니다: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('로그아웃', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+            child: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Icon(Icons.more_vert),
+            ),
+          ),
+        ],
+      ),
+      body: const HomeMainContent(),
+    );
   }
 }
 
