@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/jog_record.dart';
 import '../services/auth_provider.dart';
 import 'plogging_diary_screen.dart';
@@ -119,6 +120,22 @@ class _HomeMainContentState extends State<HomeMainContent> {
     }
   }
 
+  Future<void> _launchYouTubeVideo(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('영상을 열 수 없습니다.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final categories = [
@@ -127,6 +144,9 @@ class _HomeMainContentState extends State<HomeMainContent> {
       {'icon': Icons.map, 'label': 'Jogging\nRecord'},
       {'icon': Icons.people, 'label': 'Community'},
     ];
+    
+
+    
     final gallery = [];
     final runningDiary = [];
 
@@ -243,66 +263,7 @@ class _HomeMainContentState extends State<HomeMainContent> {
                     ),
             ),
             const SizedBox(height: 24),
-            // 모아보기
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text('모아보기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Icon(Icons.chevron_right),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 160,
-              child: gallery.isEmpty
-                  ? const Center(child: Text('아직 기록이 없습니다', style: TextStyle(color: Colors.grey, fontSize: 16)))
-                  : ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: gallery.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, idx) {
-                        final item = gallery[idx];
-                        return Container(
-                          width: 120,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                child: Image.network(
-                                  item['img'] as String,
-                                  width: 120,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    width: 120,
-                                    height: 80,
-                                    color: Colors.grey[300],
-                                    child: const Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(item['date'] as String, style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                    Text('Day ${item['day']}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                    Text('${item['km']}km', style: TextStyle(fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-            ),
+
             const SizedBox(height: 24),
           ],
         ),

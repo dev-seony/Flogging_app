@@ -9,6 +9,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/bin_location.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:provider/provider.dart';
+import '../services/badge_service.dart';
+import '../widgets/badge_unlock_popup.dart';
 
 class JoggingScreen extends StatefulWidget {
   const JoggingScreen({Key? key}) : super(key: key);
@@ -123,7 +126,7 @@ class _JoggingScreenState extends State<JoggingScreen> {
     });
   }
 
-  void _stopJogging() {
+  void _stopJogging() async {
     setState(() {
       _isJogging = false;
       _stopwatch.stop();
@@ -131,7 +134,7 @@ class _JoggingScreenState extends State<JoggingScreen> {
     
     _positionSubscription?.cancel();
     _timer?.cancel();
-    _saveJogRecord();
+    await _saveJogRecord();
 
     // 종료 마커 추가
     if (_lastPosition != null) {
@@ -158,14 +161,43 @@ class _JoggingScreenState extends State<JoggingScreen> {
     });
   }
 
-  void _saveJogRecord() {
+  Future<void> _saveJogRecord() async {
     final record = JogRecord(
       date: DateTime.now(),
       distanceKm: _totalDistance / 1000,
       durationSeconds: _stopwatch.elapsed.inSeconds,
       speedKmph: _calculateSpeed(),
     );
-    Hive.box<JogRecord>('jog_records').add(record);
+    await Hive.box<JogRecord>('jog_records').add(record);
+    
+    // 뱃지 조건 체크
+    await _checkBadgeConditions();
+  }
+
+  Future<void> _checkBadgeConditions() async {
+    final badgeService = context.read<BadgeService>();
+    final newlyUnlocked = await badgeService.checkBadgeConditions();
+    
+    if (newlyUnlocked.isNotEmpty && mounted) {
+      for (final badgeId in newlyUnlocked) {
+        final badge = badgeService.badges.firstWhere((b) => b['id'] == badgeId);
+        _showBadgeUnlockPopup(badge);
+      }
+    }
+  }
+
+  void _showBadgeUnlockPopup(Map<String, dynamic> badge) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => BadgeUnlockPopup(
+        badge: badge,
+        onClose: () {
+          Navigator.of(context).pop();
+          context.read<BadgeService>().clearNewlyUnlockedBadge();
+        },
+      ),
+    );
   }
 
   void _shareJogRecord() {

@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flogging_app/screens/community_write_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import '../models/jog_record.dart';
+import '../services/badge_service.dart';
+import '../widgets/badge_unlock_popup.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({Key? key}) : super(key: key);
@@ -13,6 +17,44 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   int _selectedTab = 0; // 0: Rank, 1: Badge, 2: 모아보기
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeBadgeService();
+  }
+
+  Future<void> _initializeBadgeService() async {
+    final badgeService = context.read<BadgeService>();
+    await badgeService.initialize();
+    await _checkBadgeConditions();
+  }
+
+  Future<void> _checkBadgeConditions() async {
+    final badgeService = context.read<BadgeService>();
+    final newlyUnlocked = await badgeService.checkBadgeConditions();
+    
+    if (newlyUnlocked.isNotEmpty && mounted) {
+      for (final badgeId in newlyUnlocked) {
+        final badge = badgeService.badges.firstWhere((b) => b['id'] == badgeId);
+        _showBadgeUnlockPopup(badge);
+      }
+    }
+  }
+
+  void _showBadgeUnlockPopup(Map<String, dynamic> badge) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => BadgeUnlockPopup(
+        badge: badge,
+        onClose: () {
+          Navigator.of(context).pop();
+          context.read<BadgeService>().clearNewlyUnlockedBadge();
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,71 +270,298 @@ class _InfoCard extends StatelessWidget {
 
 class _BadgeTab extends StatelessWidget {
   const _BadgeTab();
+
   @override
   Widget build(BuildContext context) {
-    final badgeList = [];
-    return badgeList.isEmpty
-        ? const Center(child: Text('아직 뱃지가 없습니다', style: TextStyle(color: Colors.grey, fontSize: 16)))
-        : Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            child: GridView.builder(
-              itemCount: badgeList.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 8,
-                childAspectRatio: 0.95,
+    return Consumer<BadgeService>(
+      builder: (context, badgeService, child) {
+        final badges = badgeService.getBadgesWithStatus();
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '뱃지 컬렉션',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              itemBuilder: (context, idx) {
-                final badge = badgeList[idx];
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Colors.grey[200],
-                      backgroundImage: badge['img'] != null ? NetworkImage(badge['img'] as String) : null,
-                      child: badge['img'] == null ? const Icon(Icons.emoji_events, color: Colors.white, size: 28) : null,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(badge['label'] ?? '', style: const TextStyle(fontSize: 11)),
-                  ],
-                );
-              },
+              const SizedBox(height: 8),
+              Text(
+                '플로깅을 통해 다양한 뱃지를 획득해보세요!',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: GridView.builder(
+                  itemCount: badges.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemBuilder: (context, idx) {
+                    final badge = badges[idx];
+                    return _BadgeCard(badge: badge);
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BadgeCard extends StatelessWidget {
+  final Map<String, dynamic> badge;
+  
+  const _BadgeCard({required this.badge});
+
+  @override
+  Widget build(BuildContext context) {
+    final isUnlocked = badge['isUnlocked'] as bool;
+    final color = badge['color'] as Color;
+    final icon = badge['icon'] as IconData;
+    final title = badge['title'] as String;
+    final description = badge['description'] as String;
+
+    return GestureDetector(
+      onTap: () {
+        _showBadgeDetail(context, badge);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-          );
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 뱃지 아이콘
+            Stack(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: isUnlocked ? color.withOpacity(0.1) : Colors.grey[100],
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isUnlocked ? color : Colors.grey[300]!,
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isUnlocked ? color : Colors.grey[400],
+                    size: 28,
+                  ),
+                ),
+                // 자물쇠 아이콘 (잠금 상태일 때만)
+                if (!isUnlocked)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[600],
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.lock,
+                        color: Colors.white,
+                        size: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // 뱃지 제목
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isUnlocked ? Colors.black87 : Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            // 뱃지 설명
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 10,
+                color: isUnlocked ? Colors.grey[600] : Colors.grey[400],
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBadgeDetail(BuildContext context, Map<String, dynamic> badge) {
+    final isUnlocked = badge['isUnlocked'] as bool;
+    final color = badge['color'] as Color;
+    final icon = badge['icon'] as IconData;
+    final title = badge['title'] as String;
+    final description = badge['description'] as String;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 뱃지 아이콘
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: isUnlocked ? color.withOpacity(0.1) : Colors.grey[100],
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isUnlocked ? color : Colors.grey[300]!,
+                  width: 3,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Icon(
+                      icon,
+                      color: isUnlocked ? color : Colors.grey[400],
+                      size: 40,
+                    ),
+                  ),
+                  if (!isUnlocked)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[600],
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.lock,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 뱃지 제목
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isUnlocked ? Colors.black87 : Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            // 뱃지 설명
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 14,
+                color: isUnlocked ? Colors.grey[600] : Colors.grey[400],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            // 상태 표시
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isUnlocked ? color.withOpacity(0.1) : Colors.grey[100],
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                isUnlocked ? '획득 완료!' : '아직 획득하지 못했습니다',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isUnlocked ? color : Colors.grey[500],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class _FeedTab extends StatelessWidget {
   const _FeedTab();
   
-  // 조깅에 도움이 되는 팁 데이터 (줄임)
+  // 조깅에 도움이 되는 팁 데이터
   final List<Map<String, dynamic>> _joggingTips = const [
     {
-      'title': '🏃‍♂️ 조깅 시작하기',
-      'content': '처음 조깅을 시작하는 분들을 위한 기본 가이드',
+      'title': '처음 조깅을 시작하는 분들을 위한 기본 가이드',
+      'content': '초보자를 위한 조깅 가이드',
       'type': 'video',
-      'thumbnail': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
-      'videoUrl': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'thumbnail': 'https://img.youtube.com/vi/Ggbm_coe5uM/maxresdefault.jpg',
+      'videoUrl': 'https://youtu.be/Ggbm_coe5uM?si=hBv0AKpGpJkgyQ9J',
       'duration': '5분',
       'category': 'beginner'
     },
     {
-      'title': '💪 올바른 자세',
-      'content': '조깅할 때 올바른 자세와 호흡법',
+      'title': '조깅할 때 올바른 자세와 호흡법',
+      'content': '올바른 자세와 호흡법',
       'type': 'video',
-      'thumbnail': 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=400&h=300&fit=crop',
-      'videoUrl': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'thumbnail': 'https://img.youtube.com/vi/Sd4M9hyK1Ss/maxresdefault.jpg',
+      'videoUrl': 'https://youtu.be/Sd4M9hyK1Ss?si=BFzGYQSjYhD5eurz',
       'duration': '3분',
       'category': 'technique'
     },
     {
-      'title': '🎵 조깅 플레이리스트',
-      'content': '조깅할 때 듣기 좋은 음악 추천',
+      'title': '조깅할 때 듣기 좋은 음악 추천',
+      'content': '조깅할 때 듣기 좋은 음악',
       'type': 'playlist',
-      'thumbnail': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
-      'videoUrl': 'https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6',
+      'thumbnail': 'https://img.youtube.com/vi/5svlvTirzpg/maxresdefault.jpg',
+      'videoUrl': 'https://youtu.be/5svlvTirzpg?si=G5BNG6zFjVfAdz3r',
       'duration': '60분',
       'category': 'motivation'
     },
@@ -324,7 +593,7 @@ class _FeedTab extends StatelessWidget {
           ),
           // 조깅 팁 가로 스크롤
           SizedBox(
-            height: 160,
+            height: 220,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: _joggingTips.length,
@@ -575,7 +844,7 @@ class _JoggingTipCard extends StatelessWidget {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: Container(
-                height: 120,
+                height: 100,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
@@ -585,7 +854,7 @@ class _JoggingTipCard extends StatelessWidget {
                     Image.network(
                       tip['thumbnail'],
                       width: double.infinity,
-                      height: 120,
+                      height: 100,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
@@ -636,24 +905,24 @@ class _JoggingTipCard extends StatelessWidget {
             ),
             // 내용
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     tip['title'],
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     tip['content'],
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: Colors.grey[600],
                     ),
                     maxLines: 2,
@@ -682,6 +951,13 @@ class _TipDetailSheet extends StatelessWidget {
   final Map<String, dynamic> tip;
   
   const _TipDetailSheet({required this.tip});
+
+  Future<void> _launchUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -772,13 +1048,7 @@ class _TipDetailSheet extends StatelessWidget {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          // URL 열기 로직 (url_launcher 패키지 필요)
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${tip['title']} 링크를 열려고 합니다'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
+                          _launchUrl(tip['videoUrl']);
                         },
                         icon: Icon(
                           tip['type'] == 'video' ? Icons.play_arrow : 

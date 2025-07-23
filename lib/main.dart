@@ -12,6 +12,7 @@ import 'screens/jogging_screen.dart';
 import 'screens/community_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_provider.dart';
+import 'services/badge_service.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier<int>(0);
 
@@ -35,8 +36,11 @@ class PloggingApp extends StatelessWidget {
   const PloggingApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => BadgeService()),
+      ],
       child: MaterialApp(
         title: 'Plogging',
         theme: ThemeData(
